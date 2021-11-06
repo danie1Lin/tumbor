@@ -1,6 +1,6 @@
 mod pb;
-
-use std::{sync::{Arc}};
+mod engine;
+use std::{borrow::Borrow, sync::{Arc}};
 
 use axum::{Router, extract::Path, handler::get};
 use base64::{URL_SAFE_NO_PAD, encode_config};
@@ -29,7 +29,6 @@ async fn main() {
 
     test();
 
-
     let addr = "127.0.0.1:3000".parse().unwrap();
     axum::Server::bind(&addr)
     .serve(app.into_make_service())
@@ -40,13 +39,15 @@ async fn main() {
 async fn generate(Path(Params { spec, url}): Path<Params>) -> Result<String, StatusCode>{
     let url = percent_decode_str(&url).decode_utf8_lossy();
     let spec: ImageSpec = spec.as_str().try_into().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let resp = reqwest::get(url.into()).await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+    let e : engine::Photon = resp.bytes().await().map_err(|_| StatusCode::BAD_GATEWAY)?;
     Ok(format!("spec: {:?}, url: {}", spec, url))
 }
 
 fn test() {
     let spec = ImageSpec{
         specs: [
-            Spec{data: Some(spec::Data::Filter(Filter{filter: 1}))},
+            Spec{data: Some(spec::Data::Crop(Crop{x1: 50, x2: 100, y1: 50, y2:100}))},
         ].to_vec(),
     };
 
